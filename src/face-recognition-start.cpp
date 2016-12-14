@@ -26,12 +26,12 @@ double getDistance(int triggerGpioPin, int echoGpioPin) {
   delay(500);
 
   // Triggering the sensor for 10 microseconds
-  // will send out 8 ultrasonic (40kHz) bursts and listen for echos
+  // Will send out 8 ultrasonic (40kHz) bursts and listen for echos
   digitalWrite(triggerGpioPin, HIGH);
   delayMicroseconds(10);
   digitalWrite(triggerGpioPin, LOW);
 
-  //Waiting for echo start
+  // Waiting for echo start
   while (digitalRead(echoGpioPin) == LOW);
   startTime = micros();
 
@@ -209,6 +209,7 @@ int main(int argc, char **argv) {
   bool faceRecognitionMode = false;
   bool trainingMode = false;
   bool showPreview = false;   // Set to true to display video window (stop VNC desktop first)
+  bool ultrasonicSensor = false;
   string trainingLabel;
 
   // Initialise the font for display of text
@@ -316,10 +317,12 @@ int main(int argc, char **argv) {
   }
 
   // Setup the GPIO wiring pins for the Ultrasonic Sensor
-  cout << "Initialising GPIO pins..." << endl;
-  wiringPiSetupGpio();
-  pinMode(triggerGpioPin, OUTPUT);
-  pinMode(echoGpioPin, INPUT);
+  if (ultrasonicSensor) {
+    cout << "Initialising GPIO pins..." << endl;
+    wiringPiSetupGpio();
+    pinMode(triggerGpioPin, OUTPUT);
+    pinMode(echoGpioPin, INPUT);
+  }
 
   // Set camera params
   camera.set(CV_CAP_PROP_FRAME_WIDTH, cameraWidth);
@@ -332,8 +335,10 @@ int main(int argc, char **argv) {
   // Open camera
   cout << "Opening camera..." << endl;
   if (!camera.open()) {
-    cerr << "Error opening camera!" << endl; return -1;
+    cerr << "Error opening camera!" << endl;
+    return -1;
   }
+  cout << "Camera opened successfully..." << endl;
 
   // Start capturing
   for (;;frameCount++) {
@@ -494,16 +499,20 @@ int main(int argc, char **argv) {
     textSize = cv::getTextSize(text, font, fontSizeLarge, fontLineThickness, &textBaseline);
     cv::putText(frame, text, cv::Point(cameraWidth - textSize.width - textMargin, cameraHeight - textMargin), font, fontSizeLarge, fontColour, fontLineThickness, fontLineType);
 
-    // Get the ultrasonic distance
-    if (frameCount % 150 == 0) {
-      distanceToObject = getDistance(triggerGpioPin, echoGpioPin);
+    // Check if the ultrasonic distance is enabled
+    if (ultrasonicSensor) {
+
+      // Get the ultrasonic distance
+      if (frameCount % 150 == 0) {
+        distanceToObject = getDistance(triggerGpioPin, echoGpioPin);
+      }
+
+      // Add the distance text
+      text = "Distance: " + cv::format("%.2f", distanceToObject) + "cm";
+      textSize = cv::getTextSize(text, font, fontSizeLarge, fontLineThickness, &textBaseline);
+      cv::putText(frame, text, cv::Point(cameraWidth - textSize.width - textMargin, textSize.height + textMargin), font, fontSizeLarge, fontColour, fontLineThickness, fontLineType);
     }
-
-    // Add the distance text
-    text = "Distance: " + cv::format("%.2f", distanceToObject) + "cm";
-    textSize = cv::getTextSize(text, font, fontSizeLarge, fontLineThickness, &textBaseline);
-    cv::putText(frame, text, cv::Point(cameraWidth - textSize.width - textMargin, textSize.height + textMargin), font, fontSizeLarge, fontColour, fontLineThickness, fontLineType);
-
+    
     // Write the image file or display the frame
 	if (showPreview) {
 		// Display the frame in the window
